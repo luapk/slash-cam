@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Wolverine WebAR - Triple Slash</title>
+    <title>Wolverine AR - Ultimate</title>
     <script type="importmap">
         {
             "imports": {
@@ -13,7 +13,7 @@
         }
     </script>
 </head>
-<body style="margin: 0; background-color: #000; font-family: sans-serif;">
+<body style="margin: 0; background-color: #000;">
     <script type="module">
         import * as THREE from 'three';
         import { ARButton } from 'three/addons/webxr/ARButton.js';
@@ -23,17 +23,10 @@
         let hitTestSource = null;
         let hitTestSourceRequested = false;
 
-        // --- ASSET SETUP ---
+        // Load your assets (Ensure these files are in your GitHub repo!)
         const loader = new THREE.TextureLoader();
         const clawTexture = loader.load('claws.png'); 
         const normalMap = loader.load('normal_map.jpg'); 
-
-        const listener = new THREE.AudioListener();
-        const sliceSound = new THREE.Audio(listener);
-        new THREE.AudioLoader().load('slice.mp3', (buffer) => {
-            sliceSound.setBuffer(buffer);
-            sliceSound.setVolume(0.6);
-        });
 
         init();
         animate();
@@ -41,9 +34,8 @@
         function init() {
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
-            camera.add(listener);
 
-            // Lighting for that 3D depth
+            // Lighting is critical for the "carved" look
             scene.add(new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1));
             const dirLight = new THREE.DirectionalLight(0xffffff, 2);
             dirLight.position.set(1, 2, 1);
@@ -57,7 +49,7 @@
 
             document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
 
-            // Target reticle
+            // Yellow Reticle
             reticle = new THREE.Mesh(
                 new THREE.RingGeometry(0.08, 0.1, 32).rotateX(-Math.PI / 2),
                 new THREE.MeshBasicMaterial({ color: 0xffff00 })
@@ -75,19 +67,20 @@
 
         function onSelect() {
             if (reticle.visible) {
-                // Audio & Haptic Punch
-                if (sliceSound.isPlaying) sliceSound.stop();
-                sliceSound.play();
                 if (navigator.vibrate) navigator.vibrate(50);
-
                 spawnSlash(reticle.matrix);
             }
         }
 
         function spawnSlash(hitMatrix) {
-            // Invisible canvas for the decal to wrap around
-            const phantomGeo = new THREE.BoxGeometry(1, 1, 0.05);
-            const phantomMesh = new THREE.Mesh(phantomGeo, new THREE.MeshBasicMaterial({ visible: false }));
+            // 1. Create a larger invisible box to "catch" the decal
+            const phantomGeo = new THREE.BoxGeometry(1, 1, 0.2);
+            const phantomMesh = new THREE.Mesh(phantomGeo, new THREE.MeshBasicMaterial({ 
+                color: 0xff0000, 
+                transparent: true, 
+                opacity: 0.1, // Set opacity to 0 once slashes appear
+                visible: true 
+            }));
             phantomMesh.position.setFromMatrixPosition(hitMatrix);
             phantomMesh.quaternion.setFromRotationMatrix(hitMatrix);
             scene.add(phantomMesh);
@@ -95,23 +88,28 @@
             const position = new THREE.Vector3().setFromMatrixPosition(hitMatrix);
             const orientation = new THREE.Euler().setFromRotationMatrix(hitMatrix);
             
-            // Adjust the Width (X) and Height (Y) to fit your triple-slash PNG
-            const size = new THREE.Vector3(0.3, 0.4, 0.1); 
+            // Width, Height, Depth (Depth must be thick enough to intersect the box)
+            const size = new THREE.Vector3(0.3, 0.4, 0.5); 
 
             const material = new THREE.MeshStandardMaterial({
-                color: 0x000000, 
+                color: 0x111111, 
                 map: clawTexture,
                 normalMap: normalMap,
                 transparent: true,
-                metalness: 0.9, // High metalness = more realistic lighting on the edges
-                roughness: 0.1,
-                polygonOffset: true,
+                metalness: 0.8,
+                roughness: 0.2,
+                depthWrite: false,        // Essential to prevent depth issues
+                polygonOffset: true,      // Prevents Z-fighting
                 polygonOffsetFactor: -4,
-                depthWrite: false
+                side: THREE.DoubleSide
             });
 
             const decalGeom = new DecalGeometry(phantomMesh, position, orientation, size);
             const decal = new THREE.Mesh(decalGeom, material);
+            
+            decal.frustumCulled = false; // Forces it to render even if camera is close
+            decal.renderOrder = 10;      // Ensures it renders on top of the red box
+            
             scene.add(decal);
         }
 
