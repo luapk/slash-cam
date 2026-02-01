@@ -1,545 +1,662 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SNIKT — Wolverine AR</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Share+Tech+Mono&family=Inter:wght@400;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; touch-action: none; }
-        #landing { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: linear-gradient(165deg, #0a0a0a 0%, #1a1008 40%, #0a0a0a 100%); z-index: 200; transition: opacity 0.6s ease, visibility 0.6s ease; }
-        #landing.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
-        .landing-glow { position: absolute; width: 300px; height: 300px; background: radial-gradient(circle, rgba(255,170,0,0.08) 0%, transparent 70%); top: 50%; left: 50%; transform: translate(-50%, -60%); animation: glow-pulse 3s ease-in-out infinite; }
-        @keyframes glow-pulse { 0%, 100% { opacity: 0.5; transform: translate(-50%, -60%) scale(1); } 50% { opacity: 1; transform: translate(-50%, -60%) scale(1.2); } }
-        .landing-claw-icon { width: 80px; height: 80px; margin-bottom: 24px; position: relative; z-index: 1; }
-        .landing-claw-icon svg { width: 100%; height: 100%; }
-        .landing-title { font-family: 'Bebas Neue', sans-serif; font-size: 56px; letter-spacing: 12px; color: #fff; text-shadow: 0 0 40px rgba(255,170,0,0.3); position: relative; z-index: 1; margin-bottom: 8px; }
-        .landing-subtitle { font-size: 11px; letter-spacing: 4px; text-transform: uppercase; color: rgba(255,170,0,0.6); margin-bottom: 48px; position: relative; z-index: 1; }
-        #start-ar-btn { position: relative; z-index: 1; background: transparent; border: 1px solid rgba(255,170,0,0.4); color: #ffaa00; font-family: 'Bebas Neue', sans-serif; font-size: 20px; letter-spacing: 6px; padding: 16px 48px; cursor: pointer; transition: all 0.3s ease; }
-        #start-ar-btn:active { background: rgba(255,170,0,0.1); border-color: rgba(255,170,0,0.8); }
-        #start-ar-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-        .landing-compat { position: absolute; bottom: 40px; font-size: 10px; letter-spacing: 1px; color: rgba(255,255,255,0.25); text-align: center; line-height: 1.6; padding: 0 32px; }
-        .unsupported-msg { position: relative; z-index: 1; text-align: center; padding: 20px 32px; max-width: 320px; }
-        .unsupported-msg p { font-size: 13px; line-height: 1.7; color: rgba(255,255,255,0.5); margin-bottom: 16px; }
-        #ar-overlay { position: fixed; inset: 0; pointer-events: none; z-index: 100; display: none; }
-        #ar-overlay.active { display: block; }
-        .ar-hud-top { position: absolute; top: 0; left: 0; right: 0; padding: 52px 20px 16px; display: flex; justify-content: space-between; align-items: flex-start; }
-        .slash-counter { font-family: 'Bebas Neue', sans-serif; font-size: 14px; letter-spacing: 3px; color: rgba(255,255,255,0.7); background: rgba(0,0,0,0.4); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); padding: 8px 14px; border: 1px solid rgba(255,255,255,0.08); border-radius: 4px; pointer-events: auto; }
-        .slash-counter span { color: #ffaa00; font-size: 22px; vertical-align: middle; }
-        .ar-btn-group { display: flex; gap: 8px; }
-        .ar-icon-btn { width: 40px; height: 40px; background: rgba(0,0,0,0.4); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.08); border-radius: 4px; color: rgba(255,255,255,0.7); display: flex; align-items: center; justify-content: center; cursor: pointer; pointer-events: auto; transition: all 0.2s ease; }
-        .ar-icon-btn:active { background: rgba(255,170,0,0.2); border-color: rgba(255,170,0,0.4); }
-        .ar-icon-btn svg { width: 20px; height: 20px; }
-        .ar-hud-bottom { position: absolute; bottom: 0; left: 0; right: 0; padding: 16px 20px 40px; display: flex; flex-direction: column; align-items: center; gap: 16px; }
-        .ar-hint { font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: rgba(255,255,255,0.5); text-align: center; text-shadow: 0 1px 4px rgba(0,0,0,0.8); transition: opacity 0.4s ease; }
-        .ar-hint.hidden { opacity: 0; }
-        .ar-action-bar { display: flex; align-items: center; gap: 20px; pointer-events: auto; }
-        .ar-action-btn { width: 44px; height: 44px; background: rgba(0,0,0,0.4); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.08); border-radius: 50%; color: rgba(255,255,255,0.7); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s ease; }
-        .ar-action-btn:active { background: rgba(255,170,0,0.2); border-color: rgba(255,170,0,0.4); }
-        .ar-action-btn svg { width: 20px; height: 20px; }
-        .slash-btn { width: 72px; height: 72px; border-radius: 50%; background: rgba(255,170,0,0.15); border: 2px solid rgba(255,170,0,0.6); color: #ffaa00; display: flex; align-items: center; justify-content: center; cursor: pointer; pointer-events: auto; transition: all 0.15s ease; position: relative; }
-        .slash-btn::after { content: ''; position: absolute; inset: -6px; border-radius: 50%; border: 1px solid rgba(255,170,0,0.15); }
-        .slash-btn:active { transform: scale(0.92); background: rgba(255,170,0,0.3); }
-        .slash-btn svg { width: 32px; height: 32px; }
-        #share-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 250; opacity: 0; visibility: hidden; transition: opacity 0.3s ease, visibility 0.3s ease; pointer-events: auto; }
-        #share-backdrop.open { opacity: 1; visibility: visible; }
-        #share-tray { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(10,10,10,0.95); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-top: 1px solid rgba(255,255,255,0.08); padding: 24px 20px 40px; z-index: 300; transform: translateY(100%); transition: transform 0.35s cubic-bezier(0.32,0.72,0,1); pointer-events: auto; }
-        #share-tray.open { transform: translateY(0); }
-        .share-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .share-header h3 { font-family: 'Bebas Neue', sans-serif; font-size: 18px; letter-spacing: 3px; color: #fff; }
-        .share-close { width: 32px; height: 32px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); border-radius: 50%; color: rgba(255,255,255,0.5); display: flex; align-items: center; justify-content: center; cursor: pointer; }
-        .share-close svg { width: 16px; height: 16px; }
-        .share-preview { width: 100%; max-height: 200px; object-fit: contain; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06); margin-bottom: 20px; display: none; }
-        .share-options { display: flex; gap: 16px; justify-content: center; }
-        .share-option { display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; pointer-events: auto; }
-        .share-option-icon { width: 56px; height: 56px; border-radius: 14px; display: flex; align-items: center; justify-content: center; transition: transform 0.15s ease; }
-        .share-option-icon:active { transform: scale(0.92); }
-        .share-option-icon svg { width: 24px; height: 24px; }
-        .share-option-label { font-size: 10px; letter-spacing: 1px; color: rgba(255,255,255,0.5); }
-        .share-native { background: linear-gradient(135deg, #ffaa00, #ff6600); }
-        .share-native svg { color: #000; }
-        .share-download, .share-copy { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1); }
-        .share-download svg, .share-copy svg { color: #fff; }
-        #map-modal { position: fixed; inset: 0; z-index: 350; background: rgba(5,5,5,0.97); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); display: none; flex-direction: column; pointer-events: auto; }
-        #map-modal.open { display: flex; }
-        .map-header { display: flex; justify-content: space-between; align-items: center; padding: 52px 20px 16px; border-bottom: 1px solid rgba(255,255,255,0.06); }
-        .map-header h3 { font-family: 'Bebas Neue', sans-serif; font-size: 20px; letter-spacing: 4px; color: #fff; }
-        .map-header .map-subtitle { font-family: 'Share Tech Mono', monospace; font-size: 10px; color: rgba(255,170,0,0.5); letter-spacing: 1px; margin-top: 2px; }
-        .map-close { width: 36px; height: 36px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); border-radius: 50%; color: rgba(255,255,255,0.5); display: flex; align-items: center; justify-content: center; cursor: pointer; }
-        .map-close svg { width: 18px; height: 18px; }
-        #map-container { flex: 1; position: relative; }
-        .map-stats { padding: 12px 20px; border-top: 1px solid rgba(255,255,255,0.06); display: flex; gap: 24px; justify-content: center; }
-        .map-stat { text-align: center; }
-        .map-stat-val { font-family: 'Bebas Neue', sans-serif; font-size: 24px; color: #ffaa00; letter-spacing: 2px; }
-        .map-stat-label { font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: rgba(255,255,255,0.3); }
-        .leaflet-tile-pane { filter: saturate(0) brightness(0.35) contrast(1.4); }
-        .leaflet-container { background: #0a0a0a !important; }
-        .leaflet-control-attribution, .leaflet-control-zoom { display: none !important; }
-        .slash-flash { position: fixed; inset: 0; background: radial-gradient(ellipse at center, rgba(255,170,0,0.15) 0%, transparent 70%); z-index: 90; pointer-events: none; opacity: 0; }
-        .slash-flash.active { animation: flash-burst 0.35s ease-out forwards; }
-        @keyframes flash-burst { 0% { opacity: 1; } 100% { opacity: 0; } }
-        .toast { position: fixed; top: 80px; left: 50%; transform: translateX(-50%) translateY(-20px); background: rgba(0,0,0,0.8); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(255,170,0,0.3); padding: 10px 20px; border-radius: 6px; font-size: 12px; letter-spacing: 1px; color: rgba(255,255,255,0.8); z-index: 400; opacity: 0; transition: all 0.3s ease; pointer-events: none; }
-        .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>SNIKT — Wolverine AR</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Share+Tech+Mono&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:'Inter',sans-serif;-webkit-tap-highlight-color:transparent;touch-action:none}
+#landing{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(165deg,#0a0a0a 0%,#1a1008 40%,#0a0a0a 100%);z-index:200;transition:opacity .6s,visibility .6s}
+#landing.hidden{opacity:0;visibility:hidden;pointer-events:none}
+.landing-glow{position:absolute;width:300px;height:300px;background:radial-gradient(circle,rgba(255,170,0,.08) 0%,transparent 70%);top:50%;left:50%;transform:translate(-50%,-60%);animation:gp 3s ease-in-out infinite}
+@keyframes gp{0%,100%{opacity:.5;transform:translate(-50%,-60%) scale(1)}50%{opacity:1;transform:translate(-50%,-60%) scale(1.2)}}
+.landing-claw{width:80px;height:80px;margin-bottom:24px;position:relative;z-index:1}
+.landing-claw svg{width:100%;height:100%}
+.landing-title{font-family:'Bebas Neue',sans-serif;font-size:56px;letter-spacing:12px;color:#fff;text-shadow:0 0 40px rgba(255,170,0,.3);position:relative;z-index:1;margin-bottom:8px}
+.landing-sub{font-size:11px;letter-spacing:4px;text-transform:uppercase;color:rgba(255,170,0,.6);margin-bottom:48px;position:relative;z-index:1}
+#start-btn{position:relative;z-index:1;background:0 0;border:1px solid rgba(255,170,0,.4);color:#ffaa00;font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:6px;padding:16px 48px;cursor:pointer;transition:.3s}
+#start-btn:active{background:rgba(255,170,0,.1)}
+#start-btn:disabled{opacity:.3}
+.landing-compat{position:absolute;bottom:40px;font-size:10px;letter-spacing:1px;color:rgba(255,255,255,.25);text-align:center;line-height:1.6;padding:0 32px}
+#ar-overlay{position:fixed;inset:0;pointer-events:none;z-index:100;display:none}
+#ar-overlay.active{display:block}
+.ar-top{position:absolute;top:0;left:0;right:0;padding:52px 20px 16px;display:flex;justify-content:space-between;align-items:flex-start}
+.counter{font-family:'Bebas Neue',sans-serif;font-size:14px;letter-spacing:3px;color:rgba(255,255,255,.7);background:rgba(0,0,0,.4);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);padding:8px 14px;border:1px solid rgba(255,255,255,.08);border-radius:4px;pointer-events:auto}
+.counter span{color:#ffaa00;font-size:22px;vertical-align:middle}
+.btn-grp{display:flex;gap:8px}
+.ib{width:40px;height:40px;background:rgba(0,0,0,.4);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.08);border-radius:4px;color:rgba(255,255,255,.7);display:flex;align-items:center;justify-content:center;cursor:pointer;pointer-events:auto;transition:.2s}
+.ib:active{background:rgba(255,170,0,.2);border-color:rgba(255,170,0,.4)}
+.ib svg{width:20px;height:20px}
+.ar-bot{position:absolute;bottom:0;left:0;right:0;padding:16px 20px 40px;display:flex;flex-direction:column;align-items:center;gap:16px}
+.hint{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,.5);text-shadow:0 1px 4px rgba(0,0,0,.8);transition:opacity .4s}
+.hint.hidden{opacity:0}
+.abar{display:flex;align-items:center;gap:20px;pointer-events:auto}
+.ab{width:44px;height:44px;background:rgba(0,0,0,.4);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.08);border-radius:50%;color:rgba(255,255,255,.7);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.2s}
+.ab:active{background:rgba(255,170,0,.2)}
+.ab svg{width:20px;height:20px}
+.sb{width:72px;height:72px;border-radius:50%;background:rgba(255,170,0,.15);border:2px solid rgba(255,170,0,.6);color:#ffaa00;display:flex;align-items:center;justify-content:center;cursor:pointer;pointer-events:auto;transition:.15s;position:relative}
+.sb::after{content:'';position:absolute;inset:-6px;border-radius:50%;border:1px solid rgba(255,170,0,.15)}
+.sb:active{transform:scale(.92);background:rgba(255,170,0,.3)}
+.sb svg{width:32px;height:32px}
+#share-bd{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:250;opacity:0;visibility:hidden;transition:.3s;pointer-events:auto}
+#share-bd.open{opacity:1;visibility:visible}
+#share-tray{position:fixed;bottom:0;left:0;right:0;background:rgba(10,10,10,.95);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid rgba(255,255,255,.08);padding:24px 20px 40px;z-index:300;transform:translateY(100%);transition:transform .35s cubic-bezier(.32,.72,0,1);pointer-events:auto}
+#share-tray.open{transform:translateY(0)}
+.sh{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+.sh h3{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:3px;color:#fff}
+.sc{width:32px;height:32px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);border-radius:50%;color:rgba(255,255,255,.5);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.sc svg{width:16px;height:16px}
+.sp{width:100%;max-height:200px;object-fit:contain;border-radius:8px;border:1px solid rgba(255,255,255,.06);margin-bottom:20px;display:none}
+.so{display:flex;gap:16px;justify-content:center}
+.sopt{display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;pointer-events:auto}
+.soi{width:56px;height:56px;border-radius:14px;display:flex;align-items:center;justify-content:center;transition:transform .15s}
+.soi:active{transform:scale(.92)}
+.soi svg{width:24px;height:24px}
+.sol{font-size:10px;letter-spacing:1px;color:rgba(255,255,255,.5)}
+.sn{background:linear-gradient(135deg,#ffaa00,#ff6600)}
+.sn svg{color:#000}
+.sd,.scp{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1)}
+.sd svg,.scp svg{color:#fff}
+#map-modal{position:fixed;inset:0;z-index:350;background:rgba(5,5,5,.97);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);display:none;flex-direction:column;pointer-events:auto}
+#map-modal.open{display:flex}
+.mh{display:flex;justify-content:space-between;align-items:center;padding:52px 20px 16px;border-bottom:1px solid rgba(255,255,255,.06)}
+.mh h3{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:4px;color:#fff}
+.mh .ms{font-family:'Share Tech Mono',monospace;font-size:10px;color:rgba(255,170,0,.5);letter-spacing:1px;margin-top:2px}
+.mc{width:36px;height:36px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);border-radius:50%;color:rgba(255,255,255,.5);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.mc svg{width:18px;height:18px}
+#map-c{flex:1;position:relative}
+.mst{padding:12px 20px;border-top:1px solid rgba(255,255,255,.06);display:flex;gap:24px;justify-content:center}
+.msi{text-align:center}
+.msv{font-family:'Bebas Neue',sans-serif;font-size:24px;color:#ffaa00;letter-spacing:2px}
+.msl{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,.3)}
+.leaflet-tile-pane{filter:saturate(0) brightness(.35) contrast(1.4)}
+.leaflet-container{background:#0a0a0a!important}
+.leaflet-control-attribution,.leaflet-control-zoom{display:none!important}
+.flash{position:fixed;inset:0;background:radial-gradient(ellipse at center,rgba(255,170,0,.15) 0%,transparent 70%);z-index:90;pointer-events:none;opacity:0}
+.flash.on{animation:fb .35s ease-out forwards}
+@keyframes fb{0%{opacity:1}100%{opacity:0}}
+.toast{position:fixed;top:80px;left:50%;transform:translateX(-50%) translateY(-20px);background:rgba(0,0,0,.8);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(255,170,0,.3);padding:10px 20px;border-radius:6px;font-size:12px;letter-spacing:1px;color:rgba(255,255,255,.8);z-index:400;opacity:0;transition:.3s;pointer-events:none}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
 </head>
 <body>
 <div id="landing">
-    <div class="landing-glow"></div>
-    <div class="landing-claw-icon"><svg viewBox="0 0 80 80" fill="none"><path d="M20 68 L24 12 L28 68" stroke="#ffaa00" stroke-width="2" fill="rgba(255,170,0,0.1)" stroke-linecap="round"/><path d="M36 68 L40 8 L44 68" stroke="#ffaa00" stroke-width="2" fill="rgba(255,170,0,0.1)" stroke-linecap="round"/><path d="M52 68 L56 12 L60 68" stroke="#ffaa00" stroke-width="2" fill="rgba(255,170,0,0.1)" stroke-linecap="round"/></svg></div>
-    <div class="landing-title">SNIKT</div>
-    <div class="landing-subtitle">Wolverine AR Experience</div>
-    <button id="start-ar-btn" disabled>CHECKING DEVICE…</button>
-    <div id="unsupported-area"></div>
-    <div class="landing-compat">WebXR Augmented Reality<br>Chrome on Android required</div>
+<div class="landing-glow"></div>
+<div class="landing-claw"><svg viewBox="0 0 80 80" fill="none"><path d="M20 68 L24 12 L28 68" stroke="#ffaa00" stroke-width="2" fill="rgba(255,170,0,.1)" stroke-linecap="round"/><path d="M36 68 L40 8 L44 68" stroke="#ffaa00" stroke-width="2" fill="rgba(255,170,0,.1)" stroke-linecap="round"/><path d="M52 68 L56 12 L60 68" stroke="#ffaa00" stroke-width="2" fill="rgba(255,170,0,.1)" stroke-linecap="round"/></svg></div>
+<div class="landing-title">SNIKT</div>
+<div class="landing-sub">Wolverine AR Experience</div>
+<button id="start-btn" disabled>CHECKING DEVICE…</button>
+<div id="notsup"></div>
+<div class="landing-compat">WebXR Augmented Reality<br>Chrome on Android required</div>
 </div>
 <div id="ar-overlay">
-    <div class="ar-hud-top">
-        <div class="slash-counter">SLASHES <span id="slash-count">0</span></div>
-        <div class="ar-btn-group">
-            <button class="ar-icon-btn" id="btn-map" title="Map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg></button>
-            <button class="ar-icon-btn" id="btn-undo" title="Undo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 105.64-11.36L1 10"/></svg></button>
-            <button class="ar-icon-btn" id="btn-clear" title="Clear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></button>
-        </div>
-    </div>
-    <div class="ar-hud-bottom">
-        <div class="ar-hint" id="ar-hint">TAP A SURFACE TO SLASH</div>
-        <div class="ar-action-bar">
-            <button class="ar-action-btn" id="btn-share" title="Share"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></button>
-            <button class="slash-btn" id="btn-slash" title="Slash!"><svg viewBox="0 0 80 80" fill="none"><path d="M20 62 L24 18 L28 62" stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M36 62 L40 14 L44 62" stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M52 62 L56 18 L60 62" stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="round"/></svg></button>
-            <button class="ar-action-btn" id="btn-exit" title="Exit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
-        </div>
-    </div>
+<div class="ar-top">
+<div class="counter">SLASHES <span id="cnt">0</span></div>
+<div class="btn-grp">
+<button class="ib" id="b-map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg></button>
+<button class="ib" id="b-undo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 105.64-11.36L1 10"/></svg></button>
+<button class="ib" id="b-clear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></button>
 </div>
-<div id="share-backdrop"></div>
+</div>
+<div class="ar-bot">
+<div class="hint" id="hint">TAP A SURFACE TO SLASH</div>
+<div class="abar">
+<button class="ab" id="b-share"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></button>
+<button class="sb" id="b-slash"><svg viewBox="0 0 80 80" fill="none"><path d="M20 62 L24 18 L28 62" stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M36 62 L40 14 L44 62" stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M52 62 L56 18 L60 62" stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="round"/></svg></button>
+<button class="ab" id="b-exit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+</div>
+</div>
+</div>
+<div id="share-bd"></div>
 <div id="share-tray">
-    <div class="share-header"><h3>SHARE SLASH</h3><button class="share-close" id="share-close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
-    <img class="share-preview" id="share-preview" alt="">
-    <div class="share-options">
-        <div class="share-option" id="share-native-btn"><div class="share-option-icon share-native"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></div><span class="share-option-label">SHARE</span></div>
-        <div class="share-option" id="share-download-btn"><div class="share-option-icon share-download"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div><span class="share-option-label">SAVE</span></div>
-        <div class="share-option" id="share-copy-btn"><div class="share-option-icon share-copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></div><span class="share-option-label">COPY</span></div>
-    </div>
+<div class="sh"><h3>SHARE SLASH</h3><button class="sc" id="s-close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+<img class="sp" id="s-prev" alt="">
+<div class="so">
+<div class="sopt" id="s-nat"><div class="soi sn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></div><span class="sol">SHARE</span></div>
+<div class="sopt" id="s-dl"><div class="soi sd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div><span class="sol">SAVE</span></div>
+<div class="sopt" id="s-cp"><div class="soi scp"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></div><span class="sol">COPY</span></div>
+</div>
 </div>
 <div id="map-modal">
-    <div class="map-header"><div><h3>SLASH MAP</h3><div class="map-subtitle" id="map-subtitle">300M RADIUS — LOADING…</div></div><button class="map-close" id="map-close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
-    <div id="map-container"></div>
-    <div class="map-stats">
-        <div class="map-stat"><div class="map-stat-val" id="map-total">0</div><div class="map-stat-label">Total Slashes</div></div>
-        <div class="map-stat"><div class="map-stat-val" id="map-radius">300M</div><div class="map-stat-label">Radius</div></div>
-        <div class="map-stat"><div class="map-stat-val" id="map-session">0</div><div class="map-stat-label">This Session</div></div>
-    </div>
+<div class="mh"><div><h3>SLASH MAP</h3><div class="ms" id="map-sub">300M RADIUS</div></div><button class="mc" id="m-close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+<div id="map-c"></div>
+<div class="mst">
+<div class="msi"><div class="msv" id="m-tot">0</div><div class="msl">Total Slashes</div></div>
+<div class="msi"><div class="msv">300M</div><div class="msl">Radius</div></div>
+<div class="msi"><div class="msv" id="m-ses">0</div><div class="msl">This Session</div></div>
 </div>
-<div class="slash-flash" id="slash-flash"></div>
+</div>
+<div class="flash" id="flash"></div>
 <div class="toast" id="toast"></div>
-
-<script type="importmap">
-{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js", "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/" } }
-</script>
+<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"}}</script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
 <script type="module">
 import * as THREE from 'three';
 
-let renderer, scene, camera, controller, reticle;
-let hitTestSource = null, hitTestSourceRequested = false, xrSession = null;
-let slashCount = 0, activeSlashes = [], lastHitMatrix = null, reticleVisible = false;
-const MAX_SLASHES = 30;
-let userGeoPos = null, slashGeoLog = [], leafletMap = null;
+// ─── STATE ───
+let renderer,scene,camera,controller,reticle;
+let hitTestSrc=null,hitTestReq=false,xrSess=null;
+let slashN=0,slashes=[],lastHitMat=null,reticleVis=false;
+const MAX=30;
+let geoPos=null,geoLog=[],lmap=null;
+let mapOpen=false; // track map state to prevent slash-on-map-open
+let depthInfo=null; // depth sensing data
 
-const $ = id => document.getElementById(id);
-const landing=$('landing'), startBtn=$('start-ar-btn'), overlay=$('ar-overlay');
-const slashCountEl=$('slash-count'), hintEl=$('ar-hint'), flashEl=$('slash-flash'), toastEl=$('toast');
-const shareTray=$('share-tray'), shareBackdrop=$('share-backdrop'), sharePreview=$('share-preview'), mapModal=$('map-modal');
+const $=id=>document.getElementById(id);
+const flashEl=$('flash'),toastEl=$('toast');
 
-// ═══ AUDIO ═══
-let audioCtx, sliceBuf, deleteBuf;
-function initAudio() {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    sliceBuf = synthSlice(); deleteBuf = synthDelete();
-    fetch('slice.mp3').then(r=>{if(!r.ok)throw 0;return r.arrayBuffer()}).then(b=>audioCtx.decodeAudioData(b)).then(d=>{sliceBuf=d}).catch(()=>{});
+// ─── AUDIO ───
+let actx,sliceBuf,delBuf;
+function initAudio(){
+    actx=new(window.AudioContext||window.webkitAudioContext)();
+    sliceBuf=mkSlice();delBuf=mkDel();
+    fetch('slice.mp3').then(r=>{if(!r.ok)throw 0;return r.arrayBuffer()}).then(b=>actx.decodeAudioData(b)).then(d=>{sliceBuf=d}).catch(()=>{});
 }
-function synthSlice() {
-    const sr=audioCtx.sampleRate, b=audioCtx.createBuffer(1,sr*0.28,sr), d=b.getChannelData(0);
-    for(let i=0;i<d.length;i++){const t=i/sr;d[i]=((Math.random()*2-1)*0.35+Math.sin(t*4800*Math.PI*2)*0.3+Math.sin(t*7200*Math.PI*2)*0.15+Math.sin(t*120*Math.PI*2)*Math.exp(-t*30)*0.3)*Math.exp(-t*18)*0.7;}
-    return b;
-}
-function synthDelete() {
-    const sr=audioCtx.sampleRate, b=audioCtx.createBuffer(1,sr*0.35,sr), d=b.getChannelData(0);
-    for(let i=0;i<d.length;i++){const t=i/sr;d[i]=((Math.random()*2-1)*0.5+Math.sin(t*(600-t*800)*Math.PI*2)*0.15)*Math.sin(t/0.35*Math.PI)*0.3;}
-    return b;
-}
-function play(buf, vol=0.5) {
-    if(!audioCtx||!buf)return;if(audioCtx.state==='suspended')audioCtx.resume();
-    const s=audioCtx.createBufferSource(),g=audioCtx.createGain(),f=audioCtx.createBiquadFilter();
-    s.buffer=buf;f.type='highpass';f.frequency.value=400;g.gain.value=vol;
-    s.connect(f);f.connect(g);g.connect(audioCtx.destination);s.start(0);
-}
+function mkSlice(){const sr=actx.sampleRate,b=actx.createBuffer(1,sr*.28,sr),d=b.getChannelData(0);for(let i=0;i<d.length;i++){const t=i/sr;d[i]=((Math.random()*2-1)*.35+Math.sin(t*4800*Math.PI*2)*.3+Math.sin(t*7200*Math.PI*2)*.15+Math.sin(t*120*Math.PI*2)*Math.exp(-t*30)*.3)*Math.exp(-t*18)*.7}return b}
+function mkDel(){const sr=actx.sampleRate,b=actx.createBuffer(1,sr*.35,sr),d=b.getChannelData(0);for(let i=0;i<d.length;i++){const t=i/sr;d[i]=((Math.random()*2-1)*.5+Math.sin(t*(600-t*800)*Math.PI*2)*.15)*Math.sin(t/.35*Math.PI)*.3}return b}
+function snd(buf,v=.5){if(!actx||!buf)return;if(actx.state==='suspended')actx.resume();const s=actx.createBufferSource(),g=actx.createGain(),f=actx.createBiquadFilter();s.buffer=buf;f.type='highpass';f.frequency.value=400;g.gain.value=v;s.connect(f);f.connect(g);g.connect(actx.destination);s.start(0)}
 
-// ═══ TEXTURES ═══
-let clawTex = createClawTex();
-new THREE.TextureLoader().load('claws.png', t=>{clawTex=t}, undefined, ()=>{});
+// ─── TEXTURES ───
+let clawTex=mkClawTex();
+new THREE.TextureLoader().load('claws.png',t=>{clawTex=t},undefined,()=>{});
 
-function createClawTex() {
-    const c=document.createElement('canvas');c.width=512;c.height=512;
-    const x=c.getContext('2d');x.clearRect(0,0,512,512);
-    [{x:140,a:-0.08},{x:256,a:0},{x:372,a:0.08}].forEach(s=>{
+function mkClawTex(){
+    const c=document.createElement('canvas');c.width=512;c.height=512;const x=c.getContext('2d');x.clearRect(0,0,512,512);
+    [{x:140,a:-.08},{x:256,a:0},{x:372,a:.08}].forEach(s=>{
         x.save();x.translate(s.x,256);x.rotate(s.a);
-        const g=x.createLinearGradient(0,-220,0,220);
-        g.addColorStop(0,'rgba(200,200,200,0)');g.addColorStop(0.08,'rgba(200,200,200,0.9)');
-        g.addColorStop(0.5,'rgba(255,255,255,1)');g.addColorStop(0.92,'rgba(200,200,200,0.9)');g.addColorStop(1,'rgba(200,200,200,0)');
-        x.beginPath();x.moveTo(-18,-220);x.quadraticCurveTo(-22,-80,-16,0);x.quadraticCurveTo(-22,80,-18,220);
-        x.lineTo(18,220);x.quadraticCurveTo(22,80,16,0);x.quadraticCurveTo(22,-80,18,-220);x.closePath();x.fillStyle=g;x.fill();
-        const ig=x.createLinearGradient(0,-200,0,200);
-        ig.addColorStop(0,'rgba(255,255,255,0)');ig.addColorStop(0.1,'rgba(255,255,255,0.6)');
-        ig.addColorStop(0.5,'rgba(255,255,255,0.9)');ig.addColorStop(0.9,'rgba(255,255,255,0.6)');ig.addColorStop(1,'rgba(255,255,255,0)');
-        x.beginPath();x.moveTo(-6,-200);x.quadraticCurveTo(-8,0,-6,200);x.lineTo(6,200);x.quadraticCurveTo(8,0,6,-200);
-        x.closePath();x.fillStyle=ig;x.fill();x.restore();
+        const g=x.createLinearGradient(0,-220,0,220);g.addColorStop(0,'rgba(200,200,200,0)');g.addColorStop(.08,'rgba(200,200,200,.9)');g.addColorStop(.5,'rgba(255,255,255,1)');g.addColorStop(.92,'rgba(200,200,200,.9)');g.addColorStop(1,'rgba(200,200,200,0)');
+        x.beginPath();x.moveTo(-18,-220);x.quadraticCurveTo(-22,-80,-16,0);x.quadraticCurveTo(-22,80,-18,220);x.lineTo(18,220);x.quadraticCurveTo(22,80,16,0);x.quadraticCurveTo(22,-80,18,-220);x.closePath();x.fillStyle=g;x.fill();
+        const ig=x.createLinearGradient(0,-200,0,200);ig.addColorStop(0,'rgba(255,255,255,0)');ig.addColorStop(.1,'rgba(255,255,255,.6)');ig.addColorStop(.5,'rgba(255,255,255,.9)');ig.addColorStop(.9,'rgba(255,255,255,.6)');ig.addColorStop(1,'rgba(255,255,255,0)');
+        x.beginPath();x.moveTo(-6,-200);x.quadraticCurveTo(-8,0,-6,200);x.lineTo(6,200);x.quadraticCurveTo(8,0,6,-200);x.closePath();x.fillStyle=ig;x.fill();x.restore();
     });
     const t=new THREE.CanvasTexture(c);t.needsUpdate=true;return t;
 }
 
-function createBloodTex() {
-    const c=document.createElement('canvas');c.width=128;c.height=128;
-    const x=c.getContext('2d');x.clearRect(0,0,128,128);
-    for(let i=0;i<3+Math.floor(Math.random()*4);i++){
-        const bx=64+(Math.random()-0.5)*40,by=64+(Math.random()-0.5)*40,r=8+Math.random()*20;
+function mkBloodTex(){
+    const c=document.createElement('canvas');c.width=128;c.height=128;const x=c.getContext('2d');x.clearRect(0,0,128,128);
+    // Core splatter with more variation
+    const nb=2+Math.floor(Math.random()*5);
+    for(let i=0;i<nb;i++){
+        const bx=64+(Math.random()-.5)*60,by=64+(Math.random()-.5)*60,r=6+Math.random()*25;
         const g=x.createRadialGradient(bx,by,0,bx,by,r);
-        g.addColorStop(0,'rgba(140,12,12,0.9)');g.addColorStop(0.5,'rgba(100,5,5,0.6)');g.addColorStop(1,'rgba(60,0,0,0)');
+        g.addColorStop(0,`rgba(${130+Math.random()*40},${Math.random()*15},${Math.random()*15},.9)`);
+        g.addColorStop(.5,`rgba(${90+Math.random()*30},5,5,.6)`);g.addColorStop(1,'rgba(60,0,0,0)');
         x.fillStyle=g;x.beginPath();
-        for(let j=0;j<=8;j++){const a=(j/8)*Math.PI*2,rd=r*(0.6+Math.random()*0.8);
-            j===0?x.moveTo(bx+Math.cos(a)*rd,by+Math.sin(a)*rd):x.quadraticCurveTo(bx+Math.cos(a-0.3)*rd*1.2,by+Math.sin(a-0.3)*rd*1.2,bx+Math.cos(a)*rd,by+Math.sin(a)*rd);
-        }x.closePath();x.fill();
+        for(let j=0;j<=8;j++){const a=(j/8)*Math.PI*2,rd=r*(.5+Math.random()*.9);j===0?x.moveTo(bx+Math.cos(a)*rd,by+Math.sin(a)*rd):x.quadraticCurveTo(bx+Math.cos(a-.3)*rd*1.3,by+Math.sin(a-.3)*rd*1.3,bx+Math.cos(a)*rd,by+Math.sin(a)*rd)}
+        x.closePath();x.fill();
     }
-    for(let i=0;i<2;i++){const sx=64+(Math.random()-0.5)*30,sy=64+Math.random()*10;
-        x.strokeStyle=`rgba(120,8,8,${0.3+Math.random()*0.4})`;x.lineWidth=1.5+Math.random()*2;x.lineCap='round';
-        x.beginPath();x.moveTo(sx,sy);x.quadraticCurveTo(sx+(Math.random()-0.5)*10,sy+20+Math.random()*15,sx+(Math.random()-0.5)*6,sy+35+Math.random()*20);x.stroke();
+    // Drip streaks — more varied
+    for(let i=0;i<1+Math.floor(Math.random()*3);i++){
+        const sx=64+(Math.random()-.5)*50,sy=40+Math.random()*30;
+        x.strokeStyle=`rgba(${110+Math.random()*30},8,8,${.3+Math.random()*.4})`;x.lineWidth=1+Math.random()*2.5;x.lineCap='round';
+        x.beginPath();x.moveTo(sx,sy);
+        x.quadraticCurveTo(sx+(Math.random()-.5)*15,sy+25+Math.random()*20,sx+(Math.random()-.5)*10,sy+40+Math.random()*25);
+        x.stroke();
     }
     const t=new THREE.CanvasTexture(c);t.needsUpdate=true;return t;
 }
 
-function createHUDTex() {
-    const c=document.createElement('canvas');c.width=256;c.height=256;
-    const x=c.getContext('2d');x.clearRect(0,0,256,256);const cx=128,cy=128;
-    x.strokeStyle='rgba(255,170,0,0.6)';x.lineWidth=1.5;x.beginPath();x.arc(cx,cy,110,0,Math.PI*2);x.stroke();
-    for(let i=0;i<36;i++){const a=(i/36)*Math.PI*2,l=i%3===0?12:5;
-        x.strokeStyle=i%3===0?'rgba(255,170,0,0.7)':'rgba(255,170,0,0.25)';x.lineWidth=i%3===0?1.5:0.8;
-        x.beginPath();x.moveTo(cx+Math.cos(a)*(110-l),cy+Math.sin(a)*(110-l));x.lineTo(cx+Math.cos(a)*110,cy+Math.sin(a)*110);x.stroke();
+// ─── HUD TEXTURE — vector drawn, no web fonts ───
+function mkHUDTex(){
+    const c=document.createElement('canvas');c.width=512;c.height=512;
+    const x=c.getContext('2d');x.clearRect(0,0,512,512);
+    const cx=256,cy=256;
+
+    // Outer ring — crisp
+    x.strokeStyle='rgba(255,170,0,.5)';x.lineWidth=2;
+    x.beginPath();x.arc(cx,cy,220,0,Math.PI*2);x.stroke();
+
+    // Tick marks — 72 of them
+    for(let i=0;i<72;i++){
+        const a=(i/72)*Math.PI*2;
+        const major=i%6===0, mid=i%3===0;
+        const len=major?24:mid?14:7;
+        x.strokeStyle=major?'rgba(255,170,0,.7)':mid?'rgba(255,170,0,.35)':'rgba(255,170,0,.15)';
+        x.lineWidth=major?2:1;
+        x.beginPath();
+        x.moveTo(cx+Math.cos(a)*(220-len),cy+Math.sin(a)*(220-len));
+        x.lineTo(cx+Math.cos(a)*220,cy+Math.sin(a)*220);
+        x.stroke();
     }
-    x.setLineDash([4,8]);x.strokeStyle='rgba(255,170,0,0.2)';x.lineWidth=1;x.beginPath();x.arc(cx,cy,85,0,Math.PI*2);x.stroke();x.setLineDash([]);
-    x.strokeStyle='rgba(255,170,0,0.5)';x.lineWidth=2;
-    [[30,30,1,1],[226,30,-1,1],[30,226,1,-1],[226,226,-1,-1]].forEach(([px,py,dx,dy])=>{x.beginPath();x.moveTo(px+dx*25,py);x.lineTo(px,py);x.lineTo(px,py+dy*25);x.stroke();});
-    x.fillStyle='rgba(255,170,0,0.4)';
-    [[cx,cy-6],[cx,cy+6],[cx-6,cy],[cx+6,cy]].forEach(([a,b])=>{x.beginPath();x.arc(a,b,1.5,0,Math.PI*2);x.fill();});
-    x.font='9px "Share Tech Mono",monospace';x.fillStyle='rgba(255,170,0,0.45)';x.textAlign='center';
-    x.fillText('TARGET LOCK',cx,32);x.fillText('ADAMANTIUM',cx,240);
+
+    // Inner dashed ring
+    x.setLineDash([6,12]);x.strokeStyle='rgba(255,170,0,.15)';x.lineWidth=1;
+    x.beginPath();x.arc(cx,cy,170,0,Math.PI*2);x.stroke();x.setLineDash([]);
+
+    // Second inner ring — partial arcs
+    x.strokeStyle='rgba(255,170,0,.2)';x.lineWidth=1.5;
+    x.beginPath();x.arc(cx,cy,140,-0.3,1.2);x.stroke();
+    x.beginPath();x.arc(cx,cy,140,Math.PI-0.5,Math.PI+1);x.stroke();
+
+    // Corner brackets
+    const bL=50,bO=40;
+    x.strokeStyle='rgba(255,170,0,.45)';x.lineWidth=2.5;
+    [[bO,bO,1,1],[512-bO,bO,-1,1],[bO,512-bO,1,-1],[512-bO,512-bO,-1,-1]].forEach(([px,py,dx,dy])=>{
+        x.beginPath();x.moveTo(px+dx*bL,py);x.lineTo(px,py);x.lineTo(px,py+dy*bL);x.stroke();
+    });
+
+    // Crosshair
+    x.strokeStyle='rgba(255,170,0,.35)';x.lineWidth=1;
+    [[cx-12,cy,cx-4,cy],[cx+4,cy,cx+12,cy],[cx,cy-12,cx,cy-4],[cx,cy+4,cx,cy+12]].forEach(([x1,y1,x2,y2])=>{
+        x.beginPath();x.moveTo(x1,y1);x.lineTo(x2,y2);x.stroke();
+    });
+    x.fillStyle='rgba(255,170,0,.5)';x.beginPath();x.arc(cx,cy,2,0,Math.PI*2);x.fill();
+
+    // TEXT — using basic sans-serif (guaranteed available)
+    x.font='bold 16px monospace';x.fillStyle='rgba(255,170,0,.5)';x.textAlign='center';
+    x.fillText('TARGET LOCK',cx,52);
+    x.fillText('ADAMANTIUM',cx,485);
+
+    // Side labels
+    x.save();x.translate(35,256);x.rotate(-Math.PI/2);x.font='11px monospace';x.fillStyle='rgba(255,170,0,.3)';x.textAlign='center';x.fillText('X-FORCE',0,0);x.restore();
+    x.save();x.translate(477,256);x.rotate(Math.PI/2);x.font='11px monospace';x.fillStyle='rgba(255,170,0,.3)';x.textAlign='center';x.fillText('WEAPON X',0,0);x.restore();
+
+    // Corner data readouts
+    x.font='10px monospace';x.fillStyle='rgba(255,170,0,.25)';x.textAlign='left';
+    x.fillText('DST: 0.3M',bO+8,bO+60);
+    x.textAlign='right';
+    x.fillText('NRM: OK',512-bO-8,bO+60);
+    x.textAlign='left';
+    x.fillText('MAT: STEEL',bO+8,512-bO-46);
+
     const t=new THREE.CanvasTexture(c);t.needsUpdate=true;return t;
 }
-const hudTex = createHUDTex();
+const hudTex=mkHUDTex();
 
-// ═══ RETICLE ═══
-function makeReticle() {
+// ─── RETICLE ───
+function mkReticle(){
     const g=new THREE.Group();
-    g.add(new THREE.Mesh(new THREE.RingGeometry(0.08,0.09,32),new THREE.MeshBasicMaterial({color:0xffaa00,transparent:true,opacity:0.6,side:THREE.DoubleSide,depthTest:false})));
-    const v=new Float32Array([-0.02,0,0,-0.02,0.05,0,0,0,0,0,0.06,0,0.02,0,0,0.02,0.05,0]);
+    g.add(new THREE.Mesh(new THREE.RingGeometry(.08,.09,32),new THREE.MeshBasicMaterial({color:0xffaa00,transparent:true,opacity:.6,side:THREE.DoubleSide,depthTest:false})));
+    const v=new Float32Array([-.02,0,0,-.02,.05,0, 0,0,0,0,.06,0, .02,0,0,.02,.05,0]);
     const lg=new THREE.BufferGeometry();lg.setAttribute('position',new THREE.BufferAttribute(v,3));
-    g.add(new THREE.LineSegments(lg,new THREE.LineBasicMaterial({color:0xffaa00,transparent:true,opacity:0.8,depthTest:false})));
+    g.add(new THREE.LineSegments(lg,new THREE.LineBasicMaterial({color:0xffaa00,transparent:true,opacity:.8,depthTest:false})));
     g.matrixAutoUpdate=false;g.visible=false;g.renderOrder=999;return g;
 }
 
-// ═══ SPAWN SLASH ═══
-function spawnSlash(hitMatrix) {
-    if(activeSlashes.length>=MAX_SLASHES)removeOldest();
-    const pos=new THREE.Vector3(), quat=new THREE.Quaternion(), scl=new THREE.Vector3();
-    hitMatrix.decompose(pos, quat, scl);
+// ─── DEPTH OCCLUSION SHADER ───
+// Custom ShaderMaterial that uses WebXR depth buffer to clip fragments
+// where real-world geometry is CLOSER than the slash
+const depthOcclusionVertexShader = `
+varying vec2 vUv;
+varying vec4 vWorldPos;
+void main(){
+    vUv = uv;
+    vWorldPos = modelMatrix * vec4(position, 1.0);
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}`;
 
-    // ═══ CRITICAL ORIENTATION FIX ═══
-    // WebXR hit-test pose: Y-axis = surface normal
-    // PlaneGeometry faces +Z by default
-    // We rotate -90° around local X to align plane's +Z with pose's +Y (the normal)
-    const align = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0), -Math.PI/2);
+const depthOcclusionFragmentShader = `
+uniform sampler2D uTexture;
+uniform float uOpacity;
+uniform vec3 uColor;
+uniform sampler2D uDepthTexture;
+uniform mat4 uDepthUVTransform;
+uniform float uRawValueToMeters;
+uniform bool uHasDepth;
+varying vec2 vUv;
+varying vec4 vWorldPos;
 
-    // Random twist around surface normal for natural variety
-    const twist = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0), (Math.random()-0.5)*0.7);
+void main(){
+    vec4 texColor = texture2D(uTexture, vUv);
+    texColor.rgb *= uColor;
+    texColor.a *= uOpacity;
+    if(texColor.a < 0.01) discard;
 
-    // Final: poseQuat * twist * align
-    const finalQ = new THREE.Quaternion().copy(quat).multiply(twist).multiply(align);
+    // Depth occlusion: if we have depth data, compare
+    if(uHasDepth){
+        // Transform world position to depth UV space
+        vec4 depthUV = uDepthUVTransform * vec4(gl_FragCoord.x / ${window.innerWidth.toFixed(1)}, gl_FragCoord.y / ${window.innerHeight.toFixed(1)}, 0.0, 1.0);
+        vec2 dUV = depthUV.xy / depthUV.w;
+        if(dUV.x >= 0.0 && dUV.x <= 1.0 && dUV.y >= 0.0 && dUV.y <= 1.0){
+            float rawDepth = texture2D(uDepthTexture, dUV).r;
+            float depthM = rawDepth * uRawValueToMeters;
+            float fragDepth = length(vWorldPos.xyz - cameraPosition);
+            // If real world is closer, discard (with small tolerance)
+            if(depthM > 0.0 && depthM < fragDepth - 0.02){
+                discard;
+            }
+        }
+    }
+    gl_FragColor = texColor;
+}`;
 
-    const group = new THREE.Group();
+// ─── SPAWN SLASH ───
+function spawnSlash(hitMat){
+    if(slashes.length>=MAX)removeOldest();
+    const pos=new THREE.Vector3(),quat=new THREE.Quaternion(),scl=new THREE.Vector3();
+    hitMat.decompose(pos,quat,scl);
+
+    // Orientation fix: pose Y = surface normal, PlaneGeo faces +Z
+    // Rotate -90° around local X to align
+    const align=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),-Math.PI/2);
+    const twist=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),(Math.random()-.5)*.7);
+    const finalQ=new THREE.Quaternion().copy(quat).multiply(twist).multiply(align);
+
+    const group=new THREE.Group();
     group.position.copy(pos);
     group.quaternion.copy(finalQ);
 
-    // Claw marks — very thin offset to hug surface
-    const plane = new THREE.Mesh(
-        new THREE.PlaneGeometry(0.35, 0.45),
-        new THREE.MeshBasicMaterial({ map:clawTex, transparent:true, opacity:0, side:THREE.DoubleSide, depthWrite:false })
+    // Claw marks
+    const plane=new THREE.Mesh(
+        new THREE.PlaneGeometry(.35,.45),
+        new THREE.MeshBasicMaterial({map:clawTex,transparent:true,opacity:0,side:THREE.DoubleSide,depthWrite:false,depthTest:true})
     );
-    plane.position.z=0.003; plane.renderOrder=10+activeSlashes.length;
+    plane.position.z=.003;plane.renderOrder=10+slashes.length;
     group.add(plane);
 
-    // Edge darkening (simulates depth/shadow of the scratch)
-    const shadow = new THREE.Mesh(
-        new THREE.PlaneGeometry(0.37, 0.47),
-        new THREE.MeshBasicMaterial({ color:0x000000, transparent:true, opacity:0, side:THREE.DoubleSide, depthWrite:false })
+    // Shadow plane for depth
+    const shadow=new THREE.Mesh(
+        new THREE.PlaneGeometry(.37,.47),
+        new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:0,side:THREE.DoubleSide,depthWrite:false})
     );
-    shadow.position.z=0.001; shadow.renderOrder=8;
+    shadow.position.z=.001;shadow.renderOrder=8;
     group.add(shadow);
 
     // Glow
-    const glow = new THREE.Mesh(
-        new THREE.PlaneGeometry(0.5, 0.6),
-        new THREE.MeshBasicMaterial({ color:0xffaa00, transparent:true, opacity:0, side:THREE.DoubleSide, depthWrite:false, depthTest:false, blending:THREE.AdditiveBlending })
+    const glow=new THREE.Mesh(
+        new THREE.PlaneGeometry(.5,.6),
+        new THREE.MeshBasicMaterial({color:0xffaa00,transparent:true,opacity:0,side:THREE.DoubleSide,depthWrite:false,depthTest:false,blending:THREE.AdditiveBlending})
     );
-    glow.position.z=0.002; glow.renderOrder=9;
+    glow.position.z=.002;glow.renderOrder=9;
     group.add(glow);
 
-    // Tactical HUD ring
-    const hud = new THREE.Mesh(
-        new THREE.PlaneGeometry(0.7, 0.7),
-        new THREE.MeshBasicMaterial({ map:hudTex, transparent:true, opacity:0, side:THREE.DoubleSide, depthWrite:false, depthTest:false, blending:THREE.AdditiveBlending })
+    // HUD
+    const hud=new THREE.Mesh(
+        new THREE.PlaneGeometry(.8,.8),
+        new THREE.MeshBasicMaterial({map:hudTex,transparent:true,opacity:0,side:THREE.DoubleSide,depthWrite:false,depthTest:false,blending:THREE.AdditiveBlending})
     );
-    hud.position.z=0.005; hud.renderOrder=15;
+    hud.position.z=.006;hud.renderOrder=15;
     group.add(hud);
 
-    // Blood splats
-    const bloods = [];
-    for(let i=0;i<3+Math.floor(Math.random()*3);i++){
-        const sz=0.06+Math.random()*0.1;
-        const sp = new THREE.Mesh(
+    // Blood splats — WIDER scatter, more random
+    const bloods=[];
+    const nSplat=3+Math.floor(Math.random()*4);
+    for(let i=0;i<nSplat;i++){
+        const sz=.04+Math.random()*.12;
+        const sp=new THREE.Mesh(
             new THREE.PlaneGeometry(sz,sz),
-            new THREE.MeshBasicMaterial({ map:createBloodTex(), transparent:true, opacity:0, side:THREE.DoubleSide, depthWrite:false })
+            new THREE.MeshBasicMaterial({map:mkBloodTex(),transparent:true,opacity:0,side:THREE.DoubleSide,depthWrite:false})
         );
-        const sx=(Math.random()-0.5)*0.25, sy=(Math.random()-0.5)*0.3;
-        sp.position.set(sx,sy,0.002); sp.renderOrder=12;
-        sp.userData.vx=sx*3+(Math.random()-0.5)*0.5;
-        sp.userData.vy=sy*3+(Math.random()-0.5)*0.3;
-        sp.userData.delay=Math.random()*0.05;
-        group.add(sp); bloods.push(sp);
+        // Much wider initial spread
+        const angle=Math.random()*Math.PI*2;
+        const dist=.12+Math.random()*.25; // 12-37cm from center
+        const sx=Math.cos(angle)*dist;
+        const sy=Math.sin(angle)*dist*(0.7+Math.random()*0.6); // Elongate vertically sometimes
+        sp.position.set(sx*.3,sy*.3,.002);
+        sp.rotation.z=Math.random()*Math.PI*2; // Random rotation
+        sp.renderOrder=12;
+        sp.userData.targetX=sx;
+        sp.userData.targetY=sy;
+        sp.userData.delay=Math.random()*.08;
+        sp.userData.finalScale=.6+Math.random()*.8;
+        group.add(sp);bloods.push(sp);
     }
 
     scene.add(group);
-    activeSlashes.push({ group, plane, shadow, glow, hud, bloods, time:0, phase:'intro' });
-    slashCount++; slashCountEl.textContent=slashCount;
-    if(slashCount===1)hintEl.classList.add('hidden');
+    slashes.push({group,plane,shadow,glow,hud,bloods,time:0,phase:'intro'});
+    slashN++;$('cnt').textContent=slashN;
+    if(slashN===1)$('hint').classList.add('hidden');
     logGeo();
 }
 
-// ═══ ANIMATION ═══
-function updateSlashes(dt) {
-    activeSlashes.forEach(s => {
-        s.time += dt;
-        const t = s.time;
-
-        if (s.phase === 'intro') {
-            const p = Math.min(t / 0.25, 1);
-            const e = 1 - Math.pow(1 - p, 4);
-
-            // Claws: scale in with overshoot
-            s.plane.scale.set(e * (1 + (1-p)*0.12), e, 1);
-            s.plane.material.opacity = Math.min(p * 4, 1);
-
-            // Shadow behind claws for depth
-            s.shadow.material.opacity = Math.min(p * 2, 0.15);
-            s.shadow.scale.set(e, e, 1);
-
-            // Momentary bright glow ON the claw marks
-            if (p < 0.5) {
-                const gi = 1 - p / 0.5;
-                s.plane.material.color.setRGB(1 + gi * 0.6, 1 + gi * 0.25, 1);
-            } else {
-                s.plane.material.color.setRGB(1, 1, 1);
-            }
-
-            // Ambient glow behind
-            s.glow.material.opacity = (1 - p) * 0.5;
-            s.glow.scale.set(1 + p * 0.4, 1 + p * 0.4, 1);
-
-            // HUD: spin in, scale up, fade
-            s.hud.material.opacity = (1 - p) * 0.7;
-            s.hud.rotation.z = p * Math.PI * 0.4;
-            const hs = 0.5 + p * 0.8;
-            s.hud.scale.set(hs, hs, 1);
-
-            // Blood: spray outward with stagger
-            s.bloods.forEach(sp => {
-                const bp = Math.max(0, Math.min((t - sp.userData.delay) / 0.2, 1));
-                const be = 1 - Math.pow(1 - bp, 3);
-                sp.material.opacity = be * 0.85;
-                sp.position.x = sp.userData.vx * 0.08 * (0.3 + be * 0.7);
-                sp.position.y = sp.userData.vy * 0.08 * (0.3 + be * 0.7);
-                sp.scale.set(0.5 + be * 0.5, 0.5 + be * 0.5, 1);
+// ─── ANIMATION ───
+function updateSlashes(dt){
+    slashes.forEach(s=>{
+        s.time+=dt;const t=s.time;
+        if(s.phase==='intro'){
+            const p=Math.min(t/.25,1),e=1-Math.pow(1-p,4);
+            s.plane.scale.set(e*(1+(1-p)*.12),e,1);
+            s.plane.material.opacity=Math.min(p*4,1);
+            s.shadow.material.opacity=Math.min(p*2,.15);s.shadow.scale.set(e,e,1);
+            // Hot glow on claw marks themselves
+            if(p<.5){const gi=1-p/.5;s.plane.material.color.setRGB(1+gi*.6,1+gi*.25,1)}
+            else s.plane.material.color.setRGB(1,1,1);
+            // Ambient glow
+            s.glow.material.opacity=(1-p)*.5;s.glow.scale.set(1+p*.4,1+p*.4,1);
+            // HUD: spin in, bigger, more visible
+            s.hud.material.opacity=(1-p)*.8;
+            s.hud.rotation.z=p*Math.PI*.5;
+            const hs=.4+p*1;s.hud.scale.set(hs,hs,1);
+            // Blood: fly out to final positions
+            s.bloods.forEach(sp=>{
+                const bp=Math.max(0,Math.min((t-sp.userData.delay)/.2,1));
+                const be=1-Math.pow(1-bp,3);
+                sp.material.opacity=be*.85;
+                sp.position.x=sp.userData.targetX*.3+(sp.userData.targetX*.7)*be;
+                sp.position.y=sp.userData.targetY*.3+(sp.userData.targetY*.7)*be;
+                const fs=sp.userData.finalScale;
+                sp.scale.set(.3+be*fs,.3+be*fs,1);
             });
-
-            if (p >= 1) { s.phase = 'settle'; s.time = 0; }
-        } else if (s.phase === 'settle') {
-            const p = Math.min(t / 0.8, 1);
-            s.hud.material.opacity = (1 - p) * 0.15;
-            s.hud.rotation.z += dt * 0.3;
-            s.glow.material.opacity = (1 - p) * 0.08;
-            s.bloods.forEach(sp => { sp.material.opacity = 0.85 - p * 0.25; });
-            s.plane.material.opacity = 1 - p * 0.05;
-
-            if (p >= 1) {
-                s.phase = 'idle'; s.time = 0;
-                if (s.hud.parent) s.hud.parent.remove(s.hud);
-                s.hud.geometry.dispose(); s.hud.material.dispose();
+            if(p>=1){s.phase='settle';s.time=0}
+        }else if(s.phase==='settle'){
+            const p=Math.min(t/.8,1);
+            s.hud.material.opacity=(1-p)*.2;s.hud.rotation.z+=dt*.3;
+            s.glow.material.opacity=(1-p)*.08;
+            s.bloods.forEach(sp=>{sp.material.opacity=.85-p*.25});
+            s.plane.material.opacity=1-p*.05;
+            if(p>=1){
+                s.phase='idle';s.time=0;
+                if(s.hud.parent)s.hud.parent.remove(s.hud);
+                s.hud.geometry.dispose();s.hud.material.dispose();
             }
-        } else if (s.phase === 'idle') {
-            s.plane.material.opacity = 0.92 + Math.sin(t * 1.5) * 0.04;
-            const f = Math.max(0.4, 0.6 - t * 0.01);
-            s.bloods.forEach(sp => { sp.material.opacity = f + Math.sin(t * 0.8) * 0.02; });
+        }else if(s.phase==='idle'){
+            s.plane.material.opacity=.92+Math.sin(t*1.5)*.04;
+            const f=Math.max(.4,.6-t*.01);
+            s.bloods.forEach(sp=>{sp.material.opacity=f+Math.sin(t*.8)*.02});
         }
     });
 }
 
-function removeOldest() { if(activeSlashes.length) dispose(activeSlashes.shift()); }
-function removeLast() {
-    if(!activeSlashes.length)return;
-    play(deleteBuf, 0.35); dispose(activeSlashes.pop());
-    slashCount=Math.max(0,slashCount-1); slashCountEl.textContent=slashCount;
+function removeOldest(){if(slashes.length)dispose(slashes.shift())}
+function removeLast(){
+    if(!slashes.length)return;
+    snd(delBuf,.35);dispose(slashes.pop());
+    slashN=Math.max(0,slashN-1);$('cnt').textContent=slashN;
 }
-function clearAll() {
-    if(activeSlashes.length)play(deleteBuf, 0.4);
-    activeSlashes.forEach(dispose); activeSlashes=[];
-    slashCount=0; slashCountEl.textContent='0'; hintEl.classList.remove('hidden');
+function clearAll(){
+    if(slashes.length)snd(delBuf,.4);
+    slashes.forEach(dispose);slashes=[];
+    slashN=0;$('cnt').textContent='0';$('hint').classList.remove('hidden');
 }
-function dispose(sd) {
-    sd.group.traverse(c => {
-        if(c.geometry)c.geometry.dispose();
-        if(c.material){if(c.material.map&&c.material.map!==clawTex&&c.material.map!==hudTex)c.material.map.dispose();c.material.dispose();}
-    }); scene.remove(sd.group);
+function dispose(sd){
+    sd.group.traverse(c=>{if(c.geometry)c.geometry.dispose();if(c.material){if(c.material.map&&c.material.map!==clawTex&&c.material.map!==hudTex)c.material.map.dispose();c.material.dispose()}});
+    scene.remove(sd.group);
 }
 
-// ═══ FX ═══
-function flash() { flashEl.classList.remove('active'); void flashEl.offsetWidth; flashEl.classList.add('active'); }
-function toast(m, d=2000) { toastEl.textContent=m; toastEl.classList.add('show'); setTimeout(()=>toastEl.classList.remove('show'),d); }
+// ─── FX ───
+function flash(){flashEl.classList.remove('on');void flashEl.offsetWidth;flashEl.classList.add('on')}
+function toast(m,d=2000){toastEl.textContent=m;toastEl.classList.add('show');setTimeout(()=>toastEl.classList.remove('show'),d)}
 
-// ═══ GEO & MAP ═══
-function requestGeo() {
-    if(!navigator.geolocation)return;
-    navigator.geolocation.watchPosition(p=>{userGeoPos={lat:p.coords.latitude,lng:p.coords.longitude}},()=>{},{enableHighAccuracy:true,maximumAge:5000});
-}
-function logGeo() {
-    if(!userGeoPos)return;
-    const o=()=>(Math.random()-0.5)*0.0001;
-    slashGeoLog.push({lat:userGeoPos.lat+o(),lng:userGeoPos.lng+o(),time:Date.now()});
-}
-function openMap() {
-    mapModal.classList.add('open');
-    $('map-total').textContent=slashGeoLog.length;
-    $('map-session').textContent=slashCount;
-    setTimeout(()=>{
-        if(!leafletMap){
-            leafletMap=L.map('map-container',{zoomControl:false,attributionControl:false}).setView([userGeoPos?.lat||51.505,userGeoPos?.lng||-0.09],16);
-            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(leafletMap);
-        }
-        if(userGeoPos){
-            leafletMap.setView([userGeoPos.lat,userGeoPos.lng],16);
-            $('map-subtitle').textContent=`300M RADIUS — ${userGeoPos.lat.toFixed(4)}°, ${userGeoPos.lng.toFixed(4)}°`;
-        }
-        leafletMap.eachLayer(l=>{if(l._custom)leafletMap.removeLayer(l)});
-        if(userGeoPos){
-            const c=L.circle([userGeoPos.lat,userGeoPos.lng],{radius:300,color:'#ffaa00',fillColor:'#ffaa00',fillOpacity:0.04,weight:1,opacity:0.3,dashArray:'6 4'}).addTo(leafletMap);c._custom=true;
-            const u=L.circleMarker([userGeoPos.lat,userGeoPos.lng],{radius:5,color:'#fff',fillColor:'#ffaa00',fillOpacity:1,weight:2}).addTo(leafletMap);u._custom=true;
-        }
-        slashGeoLog.forEach(s=>{
-            const age=(Date.now()-s.time)/60000, i=Math.max(0.3,1-age*0.05);
-            const d=L.circleMarker([s.lat,s.lng],{radius:10+i*8,color:'transparent',fillColor:`hsl(${20+i*20},100%,${45+i*15}%)`,fillOpacity:i*0.6,weight:0}).addTo(leafletMap);d._custom=true;
-            const co=L.circleMarker([s.lat,s.lng],{radius:3,color:'transparent',fillColor:'#ffaa00',fillOpacity:i*0.9,weight:0}).addTo(leafletMap);co._custom=true;
+// ─── GEO & MAP ───
+function reqGeo(){if(!navigator.geolocation)return;navigator.geolocation.watchPosition(p=>{geoPos={lat:p.coords.latitude,lng:p.coords.longitude}},()=>{},{enableHighAccuracy:true,maximumAge:5000})}
+function logGeo(){if(!geoPos)return;const o=()=>(Math.random()-.5)*.0001;geoLog.push({lat:geoPos.lat+o(),lng:geoPos.lng+o(),time:Date.now()})}
+
+function openMap(){
+    mapOpen=true;
+    $('map-modal').classList.add('open');
+    $('m-tot').textContent=geoLog.length;
+    $('m-ses').textContent=slashN;
+    // Force layout before Leaflet init
+    requestAnimationFrame(()=>{
+        requestAnimationFrame(()=>{
+            if(!lmap){
+                lmap=L.map('map-c',{zoomControl:false,attributionControl:false}).setView([geoPos?.lat||51.505,geoPos?.lng||-0.09],16);
+                L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(lmap);
+            }
+            if(geoPos){
+                lmap.setView([geoPos.lat,geoPos.lng],16);
+                $('map-sub').textContent=`300M RADIUS — ${geoPos.lat.toFixed(4)}°, ${geoPos.lng.toFixed(4)}°`;
+            }
+            lmap.eachLayer(l=>{if(l._c)lmap.removeLayer(l)});
+            if(geoPos){
+                const ci=L.circle([geoPos.lat,geoPos.lng],{radius:300,color:'#ffaa00',fillColor:'#ffaa00',fillOpacity:.04,weight:1,opacity:.3,dashArray:'6 4'}).addTo(lmap);ci._c=true;
+                const u=L.circleMarker([geoPos.lat,geoPos.lng],{radius:5,color:'#fff',fillColor:'#ffaa00',fillOpacity:1,weight:2}).addTo(lmap);u._c=true;
+            }
+            geoLog.forEach(s=>{
+                const age=(Date.now()-s.time)/60000,i=Math.max(.3,1-age*.05);
+                const d=L.circleMarker([s.lat,s.lng],{radius:10+i*8,color:'transparent',fillColor:`hsl(${20+i*20},100%,${45+i*15}%)`,fillOpacity:i*.6,weight:0}).addTo(lmap);d._c=true;
+                const co=L.circleMarker([s.lat,s.lng],{radius:3,color:'transparent',fillColor:'#ffaa00',fillOpacity:i*.9,weight:0}).addTo(lmap);co._c=true;
+            });
+            lmap.invalidateSize();
         });
-        leafletMap.invalidateSize();
-    },100);
+    });
 }
-function closeMap(){mapModal.classList.remove('open')}
+function closeMap(){mapOpen=false;$('map-modal').classList.remove('open')}
 
-// ═══ SHARE ═══
-let screenshotBlob=null;
+// ─── SHARE ───
+let ssBlob=null;
 async function capture(){
     if(!renderer)return null;
     const gl=renderer.getContext(),w=gl.drawingBufferWidth,h=gl.drawingBufferHeight;
     const px=new Uint8Array(w*h*4);gl.readPixels(0,0,w,h,gl.RGBA,gl.UNSIGNED_BYTE,px);
     const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');const img=x.createImageData(w,h);
-    for(let y=0;y<h;y++)for(let xx=0;xx<w;xx++){const si=((h-y-1)*w+xx)*4,di=(y*w+xx)*4;img.data[di]=px[si];img.data[di+1]=px[si+1];img.data[di+2]=px[si+2];img.data[di+3]=px[si+3];}
-    x.putImageData(img,0,0);x.fillStyle='rgba(255,170,0,0.7)';x.font=`bold ${Math.round(h*0.02)}px "Bebas Neue",sans-serif`;x.textAlign='right';x.fillText('SNIKT — Wolverine AR',w-20,h-20);
-    return new Promise(r=>c.toBlob(b=>{screenshotBlob=b;r(b)},'image/png'));
+    for(let y=0;y<h;y++)for(let xx=0;xx<w;xx++){const si=((h-y-1)*w+xx)*4,di=(y*w+xx)*4;img.data[di]=px[si];img.data[di+1]=px[si+1];img.data[di+2]=px[si+2];img.data[di+3]=px[si+3]}
+    x.putImageData(img,0,0);x.fillStyle='rgba(255,170,0,.7)';x.font=`bold ${Math.round(h*.02)}px sans-serif`;x.textAlign='right';x.fillText('SNIKT — Wolverine AR',w-20,h-20);
+    return new Promise(r=>c.toBlob(b=>{ssBlob=b;r(b)},'image/png'));
 }
-function openShare(){capture().then(b=>{if(b){sharePreview.src=URL.createObjectURL(b);sharePreview.style.display='block'}shareTray.classList.add('open');shareBackdrop.classList.add('open')})}
-function closeShare(){shareTray.classList.remove('open');shareBackdrop.classList.remove('open')}
-async function shareNat(){if(!screenshotBlob)await capture();if(!navigator.share){toast('Share not supported');return}try{await navigator.share({title:'SNIKT',text:'I slashed surfaces in AR!',files:[new File([screenshotBlob],'wolverine-ar.png',{type:'image/png'})]});closeShare()}catch(e){if(e.name!=='AbortError')toast('Cancelled')}}
-function dlShot(){if(!screenshotBlob)return;const a=document.createElement('a');a.href=URL.createObjectURL(screenshotBlob);a.download=`wolverine-ar-${Date.now()}.png`;a.click();toast('Saved');closeShare()}
-async function copyShot(){if(!screenshotBlob)return;try{await navigator.clipboard.write([new ClipboardItem({'image/png':screenshotBlob})]);toast('Copied');closeShare()}catch{toast('Copy not supported')}}
+function openShare(){capture().then(b=>{if(b){$('s-prev').src=URL.createObjectURL(b);$('s-prev').style.display='block'}$('share-tray').classList.add('open');$('share-bd').classList.add('open')})}
+function closeShare(){$('share-tray').classList.remove('open');$('share-bd').classList.remove('open')}
+async function shareNat(){if(!ssBlob)await capture();if(!navigator.share){toast('Share not supported');return}try{await navigator.share({title:'SNIKT',text:'I slashed surfaces in AR!',files:[new File([ssBlob],'wolverine-ar.png',{type:'image/png'})]});closeShare()}catch(e){if(e.name!=='AbortError')toast('Cancelled')}}
+function dlShot(){if(!ssBlob)return;const a=document.createElement('a');a.href=URL.createObjectURL(ssBlob);a.download=`wolverine-ar-${Date.now()}.png`;a.click();toast('Saved');closeShare()}
+async function cpShot(){if(!ssBlob)return;try{await navigator.clipboard.write([new ClipboardItem({'image/png':ssBlob})]);toast('Copied');closeShare()}catch{toast('Copy not supported')}}
 
-// ═══ INIT ═══
+// ─── INIT ───
 function init(){
     scene=new THREE.Scene();
-    camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,0.01,20);
+    camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.01,20);
     scene.add(new THREE.HemisphereLight(0xffffff,0xbbbbff,1.2));
-    const d=new THREE.DirectionalLight(0xffffff,1.5);d.position.set(0.5,1.5,0.8);scene.add(d);
+    const d=new THREE.DirectionalLight(0xffffff,1.5);d.position.set(.5,1.5,.8);scene.add(d);
     renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,preserveDrawingBuffer:true});
     renderer.setPixelRatio(devicePixelRatio);renderer.setSize(innerWidth,innerHeight);
     renderer.xr.enabled=true;renderer.outputColorSpace=THREE.SRGBColorSpace;
     document.body.appendChild(renderer.domElement);
-    reticle=makeReticle();scene.add(reticle);
-    controller=renderer.xr.getController(0);controller.addEventListener('select',onSelect);scene.add(controller);
+    reticle=mkReticle();scene.add(reticle);
+    controller=renderer.xr.getController(0);
+    controller.addEventListener('select',onSelect);
+    scene.add(controller);
     addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
 }
 
 async function startAR(){
     if(!navigator.xr)return;
     try{
-        xrSession=await navigator.xr.requestSession('immersive-ar',{requiredFeatures:['hit-test'],optionalFeatures:['dom-overlay','local-floor'],domOverlay:{root:$('ar-overlay')}});
-        renderer.xr.setReferenceSpaceType('local');await renderer.xr.setSession(xrSession);
-        overlay.classList.add('active');landing.classList.add('hidden');
-        if(!audioCtx)initAudio();requestGeo();
-        xrSession.addEventListener('end',onEnd);renderer.setAnimationLoop(render);
-    }catch(e){console.error(e);toast('AR failed: '+e.message)}
+        // Request depth-sensing as optional — graceful fallback if unavailable
+        xrSess=await navigator.xr.requestSession('immersive-ar',{
+            requiredFeatures:['hit-test'],
+            optionalFeatures:['dom-overlay','local-floor','depth-sensing'],
+            domOverlay:{root:$('ar-overlay')},
+            depthSensing:{
+                usagePreference:['cpu-optimized'],
+                dataFormatPreference:['luminance-alpha','float32']
+            }
+        });
+        renderer.xr.setReferenceSpaceType('local');
+        await renderer.xr.setSession(xrSess);
+        $('ar-overlay').classList.add('active');
+        $('landing').classList.add('hidden');
+        if(!actx)initAudio();reqGeo();
+        // Check if depth sensing was granted
+        if(xrSess.depthUsage){
+            console.log('Depth sensing enabled:',xrSess.depthUsage,xrSess.depthDataFormat);
+        }
+        xrSess.addEventListener('end',onEnd);
+        renderer.setAnimationLoop(render);
+    }catch(e){
+        // Retry without depth-sensing
+        try{
+            xrSess=await navigator.xr.requestSession('immersive-ar',{
+                requiredFeatures:['hit-test'],
+                optionalFeatures:['dom-overlay','local-floor'],
+                domOverlay:{root:$('ar-overlay')}
+            });
+            renderer.xr.setReferenceSpaceType('local');
+            await renderer.xr.setSession(xrSess);
+            $('ar-overlay').classList.add('active');
+            $('landing').classList.add('hidden');
+            if(!actx)initAudio();reqGeo();
+            xrSess.addEventListener('end',onEnd);
+            renderer.setAnimationLoop(render);
+        }catch(e2){
+            console.error(e2);toast('AR failed: '+e2.message);
+        }
+    }
 }
-function endAR(){if(xrSession)xrSession.end()}
-function onEnd(){xrSession=null;hitTestSource=null;hitTestSourceRequested=false;overlay.classList.remove('active');landing.classList.remove('hidden');clearAll();renderer.setAnimationLoop(null)}
-function onSelect(){if(reticleVisible&&lastHitMatrix){play(sliceBuf,0.6);flash();spawnSlash(lastHitMatrix);if(navigator.vibrate)navigator.vibrate([30,20,30])}}
 
+function endAR(){if(xrSess)xrSess.end()}
+function onEnd(){xrSess=null;hitTestSrc=null;hitTestReq=false;depthInfo=null;$('ar-overlay').classList.remove('active');$('landing').classList.remove('hidden');clearAll();renderer.setAnimationLoop(null)}
+
+function onSelect(){
+    // Don't fire slash when map or share tray is open
+    if(mapOpen)return;
+    if($('share-tray').classList.contains('open'))return;
+    if(reticleVis&&lastHitMat){snd(sliceBuf,.6);flash();spawnSlash(lastHitMat);if(navigator.vibrate)navigator.vibrate([30,20,30])}
+}
+
+// ─── RENDER ───
 let lastTS=0;
 function render(ts,frame){
-    const dt=lastTS?(ts-lastTS)/1000:0.016;lastTS=ts;
+    const dt=lastTS?(ts-lastTS)/1000:.016;lastTS=ts;
     if(frame){
         const rs=renderer.xr.getReferenceSpace(),sess=renderer.xr.getSession();
-        if(!hitTestSourceRequested){
-            sess.requestReferenceSpace('viewer').then(vs=>sess.requestHitTestSource({space:vs}).then(src=>{hitTestSource=src}).catch(e=>console.warn(e)));
-            sess.addEventListener('end',()=>{hitTestSource=null;hitTestSourceRequested=false});hitTestSourceRequested=true;
+        if(!hitTestReq){
+            sess.requestReferenceSpace('viewer').then(vs=>sess.requestHitTestSource({space:vs}).then(src=>{hitTestSrc=src}).catch(e=>console.warn(e)));
+            sess.addEventListener('end',()=>{hitTestSrc=null;hitTestReq=false});hitTestReq=true;
         }
-        if(hitTestSource){
-            const r=frame.getHitTestResults(hitTestSource);
-            if(r.length){const p=r[0].getPose(rs);if(p){reticle.visible=true;reticleVisible=true;const m=new THREE.Matrix4().fromArray(p.transform.matrix);reticle.matrix.copy(m);lastHitMatrix=m.clone()}}
-            else{reticle.visible=false;reticleVisible=false}
+        if(hitTestSrc){
+            const r=frame.getHitTestResults(hitTestSrc);
+            if(r.length){const p=r[0].getPose(rs);if(p){reticle.visible=true;reticleVis=true;const m=new THREE.Matrix4().fromArray(p.transform.matrix);reticle.matrix.copy(m);lastHitMat=m.clone()}}
+            else{reticle.visible=false;reticleVis=false}
         }
+
+        // Try to read depth data for occlusion info
+        try{
+            const viewerPose=frame.getViewerPose(rs);
+            if(viewerPose&&viewerPose.views.length>0){
+                const view=viewerPose.views[0];
+                if(view.getDepthInformation){
+                    depthInfo=view.getDepthInformation();
+                }
+            }
+        }catch(e){/* depth not available */}
     }
     updateSlashes(dt);renderer.render(scene,camera);
 }
 
 async function checkSupport(){
-    if(!navigator.xr){startBtn.textContent='AR NOT SUPPORTED';$('unsupported-area').innerHTML='<div class="unsupported-msg"><p>WebXR not available. Chrome on Android required.</p></div>';return}
-    try{if(await navigator.xr.isSessionSupported('immersive-ar')){startBtn.textContent='ENTER AR';startBtn.disabled=false}
-    else{startBtn.textContent='NOT SUPPORTED';$('unsupported-area').innerHTML='<div class="unsupported-msg"><p>Device doesn\'t support immersive AR.</p></div>'}}catch(e){startBtn.textContent='CHECK FAILED'}
+    if(!navigator.xr){$('start-btn').textContent='AR NOT SUPPORTED';$('notsup').innerHTML='<div style="text-align:center;padding:20px 32px;max-width:320px;position:relative;z-index:1"><p style="font-size:13px;line-height:1.7;color:rgba(255,255,255,.5)">WebXR not available. Chrome on Android required.</p></div>';return}
+    try{if(await navigator.xr.isSessionSupported('immersive-ar')){$('start-btn').textContent='ENTER AR';$('start-btn').disabled=false}
+    else{$('start-btn').textContent='NOT SUPPORTED'}}catch{$('start-btn').textContent='CHECK FAILED'}
 }
 
-// ═══ EVENTS ═══
-startBtn.addEventListener('click',startAR);
-$('btn-slash').addEventListener('click',e=>{e.preventDefault();e.stopPropagation();onSelect()});
-$('btn-undo').addEventListener('click',e=>{e.preventDefault();e.stopPropagation();removeLast();toast('Undo')});
-$('btn-clear').addEventListener('click',e=>{e.preventDefault();e.stopPropagation();clearAll();toast('Cleared')});
-$('btn-share').addEventListener('click',e=>{e.preventDefault();e.stopPropagation();openShare()});
-$('btn-exit').addEventListener('click',e=>{e.preventDefault();e.stopPropagation();endAR()});
-$('btn-map').addEventListener('click',e=>{e.preventDefault();e.stopPropagation();openMap()});
-$('map-close').addEventListener('click',closeMap);
-$('share-native-btn').addEventListener('click',shareNat);
-$('share-download-btn').addEventListener('click',dlShot);
-$('share-copy-btn').addEventListener('click',copyShot);
-$('share-close').addEventListener('click',closeShare);
-shareBackdrop.addEventListener('click',closeShare);
-shareTray.addEventListener('beforexrselect',e=>e.preventDefault());
-mapModal.addEventListener('beforexrselect',e=>e.preventDefault());
+// ─── EVENTS ───
+// Map button: completely isolated from slash pipeline
+$('b-map').addEventListener('click',e=>{e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();openMap()});
+$('b-map').addEventListener('pointerdown',e=>{e.stopPropagation();e.stopImmediatePropagation()});
+$('b-map').addEventListener('touchstart',e=>{e.stopPropagation();e.stopImmediatePropagation()},{passive:true});
+
+$('start-btn').addEventListener('click',startAR);
+$('b-slash').addEventListener('click',e=>{e.preventDefault();e.stopPropagation();onSelect()});
+$('b-undo').addEventListener('click',e=>{e.preventDefault();e.stopPropagation();removeLast();toast('Undo')});
+$('b-clear').addEventListener('click',e=>{e.preventDefault();e.stopPropagation();clearAll();toast('Cleared')});
+$('b-share').addEventListener('click',e=>{e.preventDefault();e.stopPropagation();openShare()});
+$('b-exit').addEventListener('click',e=>{e.preventDefault();e.stopPropagation();endAR()});
+$('m-close').addEventListener('click',e=>{e.preventDefault();e.stopPropagation();closeMap()});
+$('s-nat').addEventListener('click',shareNat);
+$('s-dl').addEventListener('click',dlShot);
+$('s-cp').addEventListener('click',cpShot);
+$('s-close').addEventListener('click',closeShare);
+$('share-bd').addEventListener('click',closeShare);
+
+// Prevent XR input propagation on all overlay panels
+[$('share-tray'),$('map-modal'),$('share-bd')].forEach(el=>{
+    el.addEventListener('beforexrselect',e=>e.preventDefault());
+    el.addEventListener('pointerdown',e=>{e.stopPropagation();e.stopImmediatePropagation()});
+    el.addEventListener('click',e=>{e.stopPropagation()});
+});
 
 init();checkSupport();
 </script>
