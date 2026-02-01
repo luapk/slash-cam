@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Wolverine AR - Ultimate</title>
+    <title>Wolverine AR - Final Debug</title>
     <script type="importmap">
         {
             "imports": {
@@ -14,19 +14,35 @@
     </script>
 </head>
 <body style="margin: 0; background-color: #000;">
+    <div id="debug" style="position:fixed; top:10px; left:10px; color:white; z-index:99; font-family:sans-serif; font-size:12px; pointer-events:none;">
+        Status: Initializing...
+    </div>
+
     <script type="module">
         import * as THREE from 'three';
         import { ARButton } from 'three/addons/webxr/ARButton.js';
         import { DecalGeometry } from 'three/addons/geometries/DecalGeometry.js';
 
+        const debug = (msg) => document.getElementById('debug').innerText = `Status: ${msg}`;
         let renderer, scene, camera, reticle, controller;
         let hitTestSource = null;
         let hitTestSourceRequested = false;
+        
+        let slashCount = 0;
+        let activeObjects = []; // Keep track of meshes to reset them
 
-        // Load your assets (Ensure these files are in your GitHub repo!)
+        // --- ASSET LOADING ---
         const loader = new THREE.TextureLoader();
-        const clawTexture = loader.load('claws.png'); 
-        const normalMap = loader.load('normal_map.jpg'); 
+        // Using relative paths exactly as they appear in your GitHub repo screenshot
+        const clawTexture = loader.load('claws.png', () => debug("PNG Loaded"), undefined, () => debug("ERROR: claws.png not found"));
+        
+        // Audio needs a listener on the camera
+        const listener = new THREE.AudioListener();
+        const sliceSound = new THREE.Audio(listener);
+        new THREE.AudioLoader().load('slice.mp3', (buffer) => {
+            sliceSound.setBuffer(buffer);
+            debug("Sound Loaded!");
+        }, undefined, () => debug("ERROR: slice.mp3 not found"));
 
         init();
         animate();
@@ -34,12 +50,12 @@
         function init() {
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+            camera.add(listener);
 
-            // Lighting is critical for the "carved" look
             scene.add(new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1));
-            const dirLight = new THREE.DirectionalLight(0xffffff, 2);
-            dirLight.position.set(1, 2, 1);
-            scene.add(dirLight);
+            const light = new THREE.DirectionalLight(0xffffff, 2);
+            light.position.set(1, 2, 1);
+            scene.add(light);
 
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setPixelRatio(window.devicePixelRatio);
@@ -49,7 +65,6 @@
 
             document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
 
-            // Yellow Reticle
             reticle = new THREE.Mesh(
                 new THREE.RingGeometry(0.08, 0.1, 32).rotateX(-Math.PI / 2),
                 new THREE.MeshBasicMaterial({ color: 0xffff00 })
@@ -67,52 +82,67 @@
 
         function onSelect() {
             if (reticle.visible) {
+                // RESET Logic
+                if (slashCount >= 3) {
+                    activeObjects.forEach(obj => {
+                        if (obj.geometry) obj.geometry.dispose(); // Cleanup memory
+                        if (obj.material) obj.material.dispose();
+                        scene.remove(obj);
+                    });
+                    activeObjects = [];
+                    slashCount = 0;
+                    debug("Scene Reset!");
+                }
+
+                // Audio Context Unlock for Mobile
+                if (sliceSound.context.state === 'suspended') {
+                    sliceSound.context.resume();
+                }
+                if (sliceSound.buffer) {
+                    if (sliceSound.isPlaying) sliceSound.stop();
+                    sliceSound.play();
+                }
+
                 if (navigator.vibrate) navigator.vibrate(50);
+
                 spawnSlash(reticle.matrix);
+                slashCount++;
             }
         }
 
         function spawnSlash(hitMatrix) {
-            // 1. Create a larger invisible box to "catch" the decal
+            // Phantom mesh must be slightly larger than the decal
             const phantomGeo = new THREE.BoxGeometry(1, 1, 0.2);
             const phantomMesh = new THREE.Mesh(phantomGeo, new THREE.MeshBasicMaterial({ 
-                color: 0xff0000, 
-                transparent: true, 
-                opacity: 0.1, // Set opacity to 0 once slashes appear
-                visible: true 
+                visible: false // Turn this to true if you need to see the "hit box" again
             }));
             phantomMesh.position.setFromMatrixPosition(hitMatrix);
             phantomMesh.quaternion.setFromRotationMatrix(hitMatrix);
             scene.add(phantomMesh);
+            activeObjects.push(phantomMesh);
 
             const position = new THREE.Vector3().setFromMatrixPosition(hitMatrix);
             const orientation = new THREE.Euler().setFromRotationMatrix(hitMatrix);
-            
-            // Width, Height, Depth (Depth must be thick enough to intersect the box)
-            const size = new THREE.Vector3(0.3, 0.4, 0.5); 
+            const size = new THREE.Vector3(0.3, 0.4, 0.5); // Deep enough to intersect phantom
 
             const material = new THREE.MeshStandardMaterial({
-                color: 0x111111, 
                 map: clawTexture,
-                normalMap: normalMap,
                 transparent: true,
-                metalness: 0.8,
-                roughness: 0.2,
-                depthWrite: false,        // Essential to prevent depth issues
-                polygonOffset: true,      // Prevents Z-fighting
+                depthWrite: false, // Prevents flickering in AR
+                polygonOffset: true,
                 polygonOffsetFactor: -4,
-                side: THREE.DoubleSide
+                side: THREE.DoubleSide // Shows on both sides of the phantom
             });
 
             const decalGeom = new DecalGeometry(phantomMesh, position, orientation, size);
             const decal = new THREE.Mesh(decalGeom, material);
-            
-            decal.frustumCulled = false; // Forces it to render even if camera is close
-            decal.renderOrder = 10;      // Ensures it renders on top of the red box
+            decal.renderOrder = 10; 
             
             scene.add(decal);
+            activeObjects.push(decal);
         }
 
+        // Standard Three.js Loop Logic
         function onWindowResize() {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
